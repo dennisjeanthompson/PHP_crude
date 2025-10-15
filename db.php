@@ -1,8 +1,25 @@
 <?php
-// Enable error reporting for development
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Error display settings for production hosting (InfinityFree compatible)
+// Note: InfinityFree requires display_errors to be OFF in production
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
+
+// Database Configuration for InfinityFree Hosting
+// IMPORTANT: Update these values with your InfinityFree database credentials
+// You can find these in your InfinityFree control panel under "MySQL Databases"
+// 
+// InfinityFree database details:
+// - Host: Typically 'sql000.infinityfreeapp.com' (check your control panel)
+// - Database: Format is usually 'if0_XXXXXXXX_dbname' (provided by InfinityFree)
+// - Username: Format is usually 'if0_XXXXXXXX' (provided by InfinityFree)
+// - Password: Your database password (set in control panel)
+//
+// Example InfinityFree configuration:
+// $host = 'sql000.infinityfreeapp.com';
+// $db   = 'if0_12345678_mydb';
+// $user = 'if0_12345678';
+// $pass = 'your_password_here';
 
 $host = 'localhost';
 $db   = 'cit173n_dst_validation';
@@ -16,18 +33,12 @@ $options = [
 ];
 
 try {
-    // Step 1: Connect to MySQL server (no DB selected)
-    $dsn = "mysql:host=$host;charset=utf8mb4";
+    // InfinityFree Note: Database must be created via control panel
+    // Connect directly to the database (CREATE DATABASE not supported on InfinityFree)
+    $dsn = "mysql:host=$host;dbname=$db;charset=utf8mb4";
     $pdo = new PDO($dsn, $user, $pass, $options);
 
-    // Step 2: Create database if not exists
-    $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
-
-    // Step 3: Connect to database
-    $dsnDb = "mysql:host=$host;dbname=$db;charset=utf8mb4";
-    $pdo = new PDO($dsnDb, $user, $pass, $options);
-
-    // Step 4: Create users table
+    // Create users table if it doesn't exist
     $createTableSQL = "
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -38,32 +49,20 @@ try {
     ";
     $pdo->exec($createTableSQL);
 
-    // Ensure the birthday column is actually a DATE (handle older/wrong schemas)
-    try {
-        $sth = $pdo->prepare("SELECT DATA_TYPE, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'birthday'");
-        $sth->execute([$db]);
-        $col = $sth->fetch();
-        if ($col) {
-            $dataType = strtolower($col['DATA_TYPE'] ?? '');
-            if ($dataType !== 'date') {
-                // Attempt to alter the column to DATE
-                // This may fail if the server user lacks privileges or data cannot be converted
-                try {
-                    $pdo->exec("ALTER TABLE users MODIFY birthday DATE NOT NULL");
-                } catch (PDOException $inner) {
-                    // If alter fails, show a helpful message during development
-                    // In production you'd log this instead
-                    trigger_error("Could not alter users.birthday to DATE: " . $inner->getMessage(), E_USER_WARNING);
-                }
-            }
-        }
-    } catch (PDOException $e) {
-        // ignore informational check errors
-    }
+    // InfinityFree Note: INFORMATION_SCHEMA queries and ALTER TABLE operations
+    // may have restricted permissions. The table is created with correct DATE type above,
+    // so schema validation is skipped for hosting compatibility.
 
 } catch (PDOException $e) {
-    // For production, you'd log this instead of displaying
-    die("DB setup failed: " . $e->getMessage());
+    // Enhanced error handling for production environment
+    // Log error details for debugging (in production, use error_log() instead of die())
+    $errorMsg = "Database connection failed. Please check your database credentials and ensure the database exists in your hosting control panel.";
+    
+    // For development/debugging, you can temporarily enable detailed errors:
+    // Uncomment the line below to see detailed error messages during setup
+    // $errorMsg .= " Details: " . $e->getMessage();
+    
+    die($errorMsg);
 }
 
 // $pdo is now available for all other files that include db.php
